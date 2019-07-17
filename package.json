@@ -9,7 +9,9 @@
   "author": "Kevin DeMarco",
   "license": "LGPL-3.0-or-later",
   "dependencies": {
+    "@grpc/proto-loader": "^0.5.1",
     "express": "^4.17.1",
+    "grpc": "^1.22.2",
     "socket.io": "^2.2.0"
   }
 }

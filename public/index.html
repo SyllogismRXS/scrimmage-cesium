@@ -5,6 +5,8 @@
     <title>scrimmage-cesium</title>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.dev.js"></script>
+    <script src="https://cesiumjs.org/releases/1.59/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesiumjs.org/releases/1.59/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
 
   </head>
   <body>
@@ -12,6 +14,14 @@
     <h1>scrimmage-cesium</h1>
 
     <script src="https://cdn.jsdelivr.net/npm/vue"></script>
+    <script src="js/socket.js"></script>
+
+    <div id="cesiumContainer" style="width: 700px; height:400px"></div>
+    <script>
+      Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiYmQ0NmZiZC0zZGNlLTQ4ZWMtODJiYi0xYTY2OTk4MDMxNDkiLCJpZCI6ODk1MCwic2NvcGVzIjpbImFzciIsImdjIl0sImlhdCI6MTU1MzExNjM4M30.cUiEWi_tRRvqkGIY7rNG40aVA9rPKaz8vYF2wQuaLyU';
+      var viewer = new Cesium.Viewer('cesiumContainer');
+    </script>
+
   </body>
 
 </html>
