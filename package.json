@@ -10,7 +10,11 @@
   "license": "LGPL-3.0-or-later",
   "dependencies": {
     "@grpc/proto-loader": "^0.5.1",
+    "cesium": "^1.59.0",
+    "esm": "^3.2.25",
     "express": "^4.17.1",
+    "geodesy": "^2.2.0",
+    "geographiclib": "^1.49.0",
     "grpc": "^1.22.2",
     "socket.io": "^2.2.0"
   }
