@@ -17,8 +17,9 @@ app.listen(3000, function () {
 });
 
 var scrimmage_grpc = require("./js/scrimmage-grpc.js");
+var sc_grpc = new scrimmage_grpc();
 
 var io = require('socket.io')(server);
 io.on('connection', function (socket) {
-    new scrimmage_grpc(socket);
+    sc_grpc.setup_socket(socket);
 });

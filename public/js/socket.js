@@ -3,13 +3,9 @@
 var socket = io.connect('http://localhost:8000');
 
 function transform_state(state) {
-    var heading = Cesium.Math.toRadians(45.0);
-    var pitch = Cesium.Math.toRadians(15.0);
-    var roll = Cesium.Math.toRadians(0.0);
-
     var position = new Cesium.Cartesian3(state.position.x, state.position.y, state.position.z);
-    var orientation = new Cesium.Transforms.headingPitchRollQuaternion(position, new Cesium.HeadingPitchRoll(heading, pitch, roll));
-
+    var orientation = new Cesium.Quaternion(state.orientation.x, state.orientation.y,
+                                            state.orientation.z, state.orientation.w);
     return {
         position: position,
         orientation: orientation,
@@ -17,13 +13,9 @@ function transform_state(state) {
 }
 
 function update_entity(contact, entity) {
-    var heading = Cesium.Math.toRadians(45.0);
-    var pitch = Cesium.Math.toRadians(15.0);
-    var roll = Cesium.Math.toRadians(0.0);
-
     let state = transform_state(contact.state);
     entity.position = state.position;
-    entity.orientation = entity.orientation;
+    entity.orientation = state.orientation;
 }
 
 function add_entity(contact, id_str) {

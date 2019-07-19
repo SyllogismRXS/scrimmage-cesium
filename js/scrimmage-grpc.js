@@ -2,9 +2,37 @@
 
 var Cesium = require("cesium");
 
+
+function quaternion_to_euler(q) {
+    let roll = Math.atan2(2 * (q.w * q.x + q.y * q.z),
+                          1 - 2 * (Math.pow(q.x, 2) + Math.pow(q.y, 2)));
+    let pitch = Math.asin(2 * (q.w * q.y - q.z * q.x));
+    let yaw = Math.atan2(2 * (q.w * q.z + q.x * q.y),
+                         1 - 2 * (Math.pow(q.y, 2) + Math.pow(q.z, 2)));
+    return {
+        roll : roll,
+        pitch : pitch,
+        yaw : yaw,
+    };
+}
+
+function rad2deg(rpy) {
+    return {
+        roll : rpy.roll * 180.0 / Math.PI,
+        pitch : rpy.pitch * 180.0 / Math.PI,
+        yaw : rpy.yaw * 180.0 / Math.PI,
+    };
+}
+
+function enu_to_gps_hpr(enu_quat) {
+    let rpy = quaternion_to_euler(enu_quat);
+    return new Cesium.HeadingPitchRoll(-rpy.yaw,
+                                       -rpy.pitch, rpy.roll);
+}
+
 module.exports = class ScrimmageGRPC {
-    constructor(socket) {
-        this.socket = socket;
+    constructor() {
+        this.socket = undefined;
 
         ///////////////////////////////
         // Load GRPC
@@ -33,6 +61,8 @@ module.exports = class ScrimmageGRPC {
 
         var that = this;
         function SendFrame(call, callback) {
+            send_reply(callback, 1);
+
             // lon, lat, height
             let origin = new Cesium.Cartesian3.fromDegrees(-120.767925, 35.721025, 300.0);
 
@@ -44,15 +74,29 @@ module.exports = class ScrimmageGRPC {
                 let position = new Cesium.Cartesian3(cnt.state.position.x,
                                                      cnt.state.position.y,
                                                      cnt.state.position.z);
-                var finalPos = Cesium.Matrix4.multiplyByPoint(ENU, position, new Cesium.Cartesian3());
+                var ecef_pos = Cesium.Matrix4.multiplyByPoint(ENU, position, new Cesium.Cartesian3());
 
-                call.request.contact[i].state.position.x = finalPos.x;
-                call.request.contact[i].state.position.y = finalPos.y;
-                call.request.contact[i].state.position.z = finalPos.z;
+                call.request.contact[i].state.position.x = ecef_pos.x;
+                call.request.contact[i].state.position.y = ecef_pos.y;
+                call.request.contact[i].state.position.z = ecef_pos.z;
+
+                let gps_hpr = enu_to_gps_hpr(cnt.state.orientation);
+                let quat = Cesium.Transforms.headingPitchRollQuaternion(
+                    ecef_pos, gps_hpr);
+
+                call.request.contact[i].state.orientation.w = quat.w;
+                call.request.contact[i].state.orientation.x = quat.x;
+                call.request.contact[i].state.orientation.y = quat.y;
+                call.request.contact[i].state.orientation.z = quat.z;
             }
 
-            that.socket.emit('frame', call.request);
-            send_reply(callback, 1);
+            if (that.socket != undefined) {
+                that.socket.emit('frame', call.request);
+            }
+        }
+
+        this.setup_socket = function(socket) {
+            this.socket = socket;
         }
 
         function SendUTMTerrain(call, callback) {
