@@ -1,0 +1,16 @@
+{
+    "webserver": {
+        "host": "localhost",
+        "port": 3000
+    },
+    "scrimmage_grpc": {
+        "rx_port": 50051,
+        "latitude_origin": 35.721025,
+        "longitude_origin": -120.767925,
+        "altitude_origin": 300
+    },
+    "socketio": {
+        "host": "localhost",
+        "port": 8000
+    }
+}

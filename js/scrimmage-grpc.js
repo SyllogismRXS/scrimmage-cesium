@@ -2,7 +2,13 @@
 
 var Cesium = require("cesium");
 
+const config = require('config');
+const grpc_rx_port = config.get('scrimmage_grpc.rx_port');
+const latitude_origin = config.get('scrimmage_grpc.latitude_origin');
+const longitude_origin = config.get('scrimmage_grpc.longitude_origin');
+const altitude_origin = config.get('scrimmage_grpc.altitude_origin');
 
+// Extract roll/pitch/yaw from a quaternion
 function quaternion_to_euler(q) {
     let roll = Math.atan2(2 * (q.w * q.x + q.y * q.z),
                           1 - 2 * (Math.pow(q.x, 2) + Math.pow(q.y, 2)));
@@ -16,6 +22,7 @@ function quaternion_to_euler(q) {
     };
 }
 
+// Convert a roll/pitch/yaw from radians to degrees
 function rad2deg(rpy) {
     return {
         roll : rpy.roll * 180.0 / Math.PI,
@@ -24,6 +31,7 @@ function rad2deg(rpy) {
     };
 }
 
+// Convert a scrimmage quaternion frame to a Cesium HeadingPitchRoll ECEF frame
 function enu_to_gps_hpr(enu_quat) {
     let rpy = quaternion_to_euler(enu_quat);
     return new Cesium.HeadingPitchRoll(-rpy.yaw,
@@ -32,7 +40,15 @@ function enu_to_gps_hpr(enu_quat) {
 
 module.exports = class ScrimmageGRPC {
     constructor() {
+        var self = this;
+
         this.socket = undefined;
+
+        // lon, lat, height
+        this.origin = new Cesium.Cartesian3.fromDegrees(
+            longitude_origin, latitude_origin, altitude_origin);
+        this.ENU = new Cesium.Matrix4();
+        Cesium.Transforms.eastNorthUpToFixedFrame(this.origin, Cesium.Ellipsoid.WGS84, this.ENU);
 
         ///////////////////////////////
         // Load GRPC
@@ -59,39 +75,40 @@ module.exports = class ScrimmageGRPC {
             callback(null, reply);
         }
 
-        var that = this;
+        function scrimmage_to_ecef_frame(contacts, idx) {
+            // Transform the point from the local cartesian system to ECEF
+            let position = new Cesium.Cartesian3(contacts[idx].state.position.x,
+                                                 contacts[idx].state.position.y,
+                                                 contacts[idx].state.position.z);
+            var ecef_pos = Cesium.Matrix4.multiplyByPoint(self.ENU, position, new Cesium.Cartesian3());
+
+            // Update the position
+            contacts[idx].state.position.x = ecef_pos.x;
+            contacts[idx].state.position.y = ecef_pos.y;
+            contacts[idx].state.position.z = ecef_pos.z;
+
+            // Convert the scrimmage ENU quaternion to the gps
+            // heading/pitch/roll
+            let gps_hpr = enu_to_gps_hpr(contacts[idx].state.orientation);
+            let quat = Cesium.Transforms.headingPitchRollQuaternion(
+                ecef_pos, gps_hpr);
+
+            // Update the quaternion
+            contacts[idx].state.orientation.w = quat.w;
+            contacts[idx].state.orientation.x = quat.x;
+            contacts[idx].state.orientation.y = quat.y;
+            contacts[idx].state.orientation.z = quat.z;
+        }
+
         function SendFrame(call, callback) {
             send_reply(callback, 1);
 
-            // lon, lat, height
-            let origin = new Cesium.Cartesian3.fromDegrees(-120.767925, 35.721025, 300.0);
-
-            var ENU = new Cesium.Matrix4();
-            Cesium.Transforms.eastNorthUpToFixedFrame(origin, Cesium.Ellipsoid.WGS84, ENU);
-
             for (let i = 0; i < call.request.contact.length; i++) {
-                let cnt = call.request.contact[i];
-                let position = new Cesium.Cartesian3(cnt.state.position.x,
-                                                     cnt.state.position.y,
-                                                     cnt.state.position.z);
-                var ecef_pos = Cesium.Matrix4.multiplyByPoint(ENU, position, new Cesium.Cartesian3());
-
-                call.request.contact[i].state.position.x = ecef_pos.x;
-                call.request.contact[i].state.position.y = ecef_pos.y;
-                call.request.contact[i].state.position.z = ecef_pos.z;
-
-                let gps_hpr = enu_to_gps_hpr(cnt.state.orientation);
-                let quat = Cesium.Transforms.headingPitchRollQuaternion(
-                    ecef_pos, gps_hpr);
-
-                call.request.contact[i].state.orientation.w = quat.w;
-                call.request.contact[i].state.orientation.x = quat.x;
-                call.request.contact[i].state.orientation.y = quat.y;
-                call.request.contact[i].state.orientation.z = quat.z;
+                scrimmage_to_ecef_frame(call.request.contact, i);
             }
 
-            if (that.socket != undefined) {
-                that.socket.emit('frame', call.request);
+            if (self.socket != undefined) {
+                self.socket.emit('frame', call.request);
             }
         }
 
@@ -142,7 +159,7 @@ module.exports = class ScrimmageGRPC {
             return server;
         }
         var scrimmage_server = getGRPCServer();
-        scrimmage_server.bind('0.0.0.0:50051', grpc.ServerCredentials.createInsecure());
+        scrimmage_server.bind(`0.0.0.0:${grpc_rx_port}`, grpc.ServerCredentials.createInsecure());
         scrimmage_server.start();
     }
 };
